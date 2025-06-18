@@ -284,6 +284,11 @@ else()
                 set(UNICORN_TARGET_ARCH "loongarch64")
                 break()
             endif()
+            string(FIND ${UC_COMPILER_MACRO} "__wasm__" UC_RET)
+            if (${UC_RET} GREATER "0")
+                set(UNICORN_TARGET_ARCH "tci")
+                break()
+            endif()
             message(FATAL_ERROR "Unknown host compiler: ${CMAKE_C_COMPILER}.")
         endwhile(TRUE)
     endif()
@@ -400,6 +405,7 @@ else()
         ${EXTRA_CFLAGS}
         ${TARGET_LIST}
         ${UNICORN_EXECUTION_MODE}
+        --disable-stack-protector --cpu=i386
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
     execute_process(COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/qemu/scripts/create_config
