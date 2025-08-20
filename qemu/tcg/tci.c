@@ -292,6 +292,7 @@ tci_read_ri(const tcg_target_ulong *regs, uint8_t **tb_ptr)
     tcg_target_ulong value;
     TCGReg r = **tb_ptr;
     *tb_ptr += 1;
+    printf("ptr %p\n", *tb_ptr);
     if (r == TCG_CONST) {
         value = tci_read_i(tb_ptr);
     } else {
@@ -474,6 +475,15 @@ static bool tci_compare64(uint64_t u0, uint64_t u1, TCGCond condition)
 # define qemu_st_beq(X)  stq_be_p(g2h(taddr), X)
 #endif
 
+GHashTable *global_helper_table = NULL;
+typedef struct TCGHelperInfo {
+    void *func;
+    const char *name;
+    unsigned flags;
+    unsigned sizemask;
+    unsigned n_args;
+} TCGHelperInfo;
+
 /* Interpret pseudo code in tb. */
 uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr)
 {
@@ -514,31 +524,46 @@ uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr)
         /* Skip opcode and size entry. */
         tb_ptr += 2;
 
+        TCGHelperInfo *info;
+
         switch (opc) {
         case INDEX_op_call:
             t0 = tci_read_ri(regs, &tb_ptr);
+
+            info = g_hash_table_lookup(global_helper_table, (gpointer)t0);
+            if (info == NULL) {
+                fprintf(stderr, "tci.c: g_hash_table_lookup\n");
+                abort();
+            }
+
+            printf("n_args: %d\n", info->n_args);
+
+            if (info->flags & 1) {
+                // return type void
+                switch (info->n_args) {
+                case 0: ((void (*)(void))t0)(); break;
+                case 1: ((void (*)(tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0)); break;
+                case 2: ((void (*)(tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1)); break;
+                case 3: ((void (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2)); break;
+                case 4: ((void (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3)); break;
+                default: abort();
+                }
+            } else {
+                switch (info->n_args) {
+                case 0: tmp64 = ((uint32_t (*)(void))t0)(); break;
+                case 1: tmp64 = ((uint32_t (*)(tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0)); break;
+                case 2: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1)); break;
+                case 3: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2)); break;
+                case 4: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3)); break;
+                default: abort();
+                }
+            }
+
+            
 #if TCG_TARGET_REG_BITS == 32
-            tmp64 = ((helper_function)t0)(tci_read_reg(regs, TCG_REG_R0),
-                                          tci_read_reg(regs, TCG_REG_R1),
-                                          tci_read_reg(regs, TCG_REG_R2),
-                                          tci_read_reg(regs, TCG_REG_R3),
-                                          tci_read_reg(regs, TCG_REG_R5),
-                                          tci_read_reg(regs, TCG_REG_R6),
-                                          tci_read_reg(regs, TCG_REG_R7),
-                                          tci_read_reg(regs, TCG_REG_R8),
-                                          tci_read_reg(regs, TCG_REG_R9),
-                                          tci_read_reg(regs, TCG_REG_R10),
-                                          tci_read_reg(regs, TCG_REG_R11),
-                                          tci_read_reg(regs, TCG_REG_R12));
             tci_write_reg(regs, TCG_REG_R0, tmp64);
             tci_write_reg(regs, TCG_REG_R1, tmp64 >> 32);
 #else
-            tmp64 = ((helper_function)t0)(tci_read_reg(regs, TCG_REG_R0),
-                                          tci_read_reg(regs, TCG_REG_R1),
-                                          tci_read_reg(regs, TCG_REG_R2),
-                                          tci_read_reg(regs, TCG_REG_R3),
-                                          tci_read_reg(regs, TCG_REG_R5),
-                                          tci_read_reg(regs, TCG_REG_R6));
             tci_write_reg(regs, TCG_REG_R0, tmp64);
 #endif
             break;
@@ -1273,3 +1298,4 @@ uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr)
 exit:
     return ret;
 }
+

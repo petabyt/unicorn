@@ -29,7 +29,9 @@
 #include <uc_priv.h>
 #include "qemu/osdep.h"
 
-#ifdef CONFIG_LINUX
+#define __wasm__
+
+#if defined(CONFIG_LINUX) && !defined(__wasm__)
 #include <linux/mman.h>
 #else  /* !CONFIG_LINUX */
 #define MAP_SYNC              0x0
@@ -179,6 +181,28 @@ static void *qemu_ram_mmap(struct uc_struct *uc,
                     size_t align,
                     bool shared)
 {
+#ifdef __wasm__
+    size_t total = size + align - getpagesize();
+    void *ptr = mmap(0, total, PROT_READ | PROT_WRITE,
+                     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    size_t offset = QEMU_ALIGN_UP((uintptr_t)ptr, align) - (uintptr_t)ptr;
+
+    if (ptr == MAP_FAILED) {
+        return NULL;
+    }
+
+    ptr += offset;
+    total -= offset;
+
+    if (offset > 0) {
+        munmap(ptr - offset, offset);
+    }
+    if (total > size) {
+        munmap(ptr + size, total - size);
+    }
+
+    return ptr;
+#else
     int flags;
     int map_sync_flags = 0;
     int guardfd;
@@ -265,6 +289,7 @@ static void *qemu_ram_mmap(struct uc_struct *uc,
     }
 
     return ptr;
+#endif
 }
 
 static void qemu_ram_munmap(struct uc_struct *uc, void *ptr, size_t size)

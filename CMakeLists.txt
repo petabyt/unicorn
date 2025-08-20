@@ -284,6 +284,11 @@ else()
                 set(UNICORN_TARGET_ARCH "loongarch64")
                 break()
             endif()
+            string(FIND ${UC_COMPILER_MACRO} "__wasm__" UC_RET)
+            if (${UC_RET} GREATER "0")
+                set(UNICORN_TARGET_ARCH "tci")
+                break()
+            endif()
             message(FATAL_ERROR "Unknown host compiler: ${CMAKE_C_COMPILER}.")
         endwhile(TRUE)
     endif()
@@ -395,10 +400,15 @@ else()
     else()
         set(UNICORN_EXECUTION_MODE "--disable-interpreter")
     endif()
+    if(EMSCRIPTEN)
+        set(EXTRA_EXTRA_CFLAGS --cpu=i386 --disable-stack-protector)
+    endif()
+    set (EXTRA_CFLAGS "${EXTRA_CFLAGS} -g")
     execute_process(COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/qemu/configure
         --cc=${CMAKE_C_COMPILER}
         ${EXTRA_CFLAGS}
         ${TARGET_LIST}
+        ${EXTRA_EXTRA_CFLAGS}
         ${UNICORN_EXECUTION_MODE}
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
@@ -508,8 +518,8 @@ else()
         -D_GNU_SOURCE
         -D_FILE_OFFSET_BITS=64
         -D_LARGEFILE_SOURCE
-        -Wall
-        -fPIC
+        -Wall -O2
+        -fPIC -fpic -fvisibility=hidden
     )
     if (ATOMIC_LINKAGE_FIX)
         add_compile_options(

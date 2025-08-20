@@ -1,0 +1,156 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e6b60aa8..03501788 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -284,6 +284,11 @@ else()
+                 set(UNICORN_TARGET_ARCH "loongarch64")
+                 break()
+             endif()
++            string(FIND ${UC_COMPILER_MACRO} "__wasm__" UC_RET)
++            if (${UC_RET} GREATER "0")
++                set(UNICORN_TARGET_ARCH "tci")
++                break()
++            endif()
+             message(FATAL_ERROR "Unknown host compiler: ${CMAKE_C_COMPILER}.")
+         endwhile(TRUE)
+     endif()
+@@ -395,10 +400,15 @@ else()
+     else()
+         set(UNICORN_EXECUTION_MODE "--disable-interpreter")
+     endif()
++    if(EMSCRIPTEN)
++        set(EXTRA_EXTRA_CFLAGS --cpu=i386 --disable-stack-protector)
++    endif()
++    set (EXTRA_CFLAGS "${EXTRA_CFLAGS} -g")
+     execute_process(COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/qemu/configure
+         --cc=${CMAKE_C_COMPILER}
+         ${EXTRA_CFLAGS}
+         ${TARGET_LIST}
++        ${EXTRA_EXTRA_CFLAGS}
+         ${UNICORN_EXECUTION_MODE}
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+     )
+@@ -508,8 +518,8 @@ else()
+         -D_GNU_SOURCE
+         -D_FILE_OFFSET_BITS=64
+         -D_LARGEFILE_SOURCE
+-        -Wall
+-        -fPIC
++        -Wall -O2
++        -fPIC -fpic -fvisibility=hidden
+     )
+     if (ATOMIC_LINKAGE_FIX)
+         add_compile_options(
+diff --git a/qemu/configure b/qemu/configure
+index 30854676..378ffecb 100755
+--- a/qemu/configure
++++ b/qemu/configure
+@@ -5,6 +5,7 @@
+ 
+ # Unset some variables known to interfere with behavior of common tools,
+ # just as autoconf does.
++set -x
+ CLICOLOR_FORCE= GREP_OPTIONS=
+ unset CLICOLOR_FORCE GREP_OPTIONS
+ 
+@@ -402,6 +403,8 @@ EOF
+ 
+ if check_define __linux__ ; then
+   targetos="Linux"
++elif check_define __wasm__ ; then
++  targetos='Linux'
+ elif check_define _WIN32 ; then
+   targetos='MINGW32'
+ elif check_define __OpenBSD__ ; then
+diff --git a/qemu/tcg/tci.c b/qemu/tcg/tci.c
+index 46fe9ce6..1fd73136 100644
+--- a/qemu/tcg/tci.c
++++ b/qemu/tcg/tci.c
+@@ -292,6 +292,7 @@ tci_read_ri(const tcg_target_ulong *regs, uint8_t **tb_ptr)
+     tcg_target_ulong value;
+     TCGReg r = **tb_ptr;
+     *tb_ptr += 1;
++    printf("ptr %p\n", *tb_ptr);
+     if (r == TCG_CONST) {
+         value = tci_read_i(tb_ptr);
+     } else {
+@@ -517,6 +518,7 @@ uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr)
+         switch (opc) {
+         case INDEX_op_call:
+             t0 = tci_read_ri(regs, &tb_ptr);
++            printf("0x%x\n", t0);
+ #if TCG_TARGET_REG_BITS == 32
+             tmp64 = ((helper_function)t0)(tci_read_reg(regs, TCG_REG_R0),
+                                           tci_read_reg(regs, TCG_REG_R1),
+@@ -1273,3 +1275,4 @@ uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr)
+ exit:
+     return ret;
+ }
++
+diff --git a/qemu/tcg/tci/tcg-target.inc.c b/qemu/tcg/tci/tcg-target.inc.c
+index ab311453..b9a891c8 100644
+--- a/qemu/tcg/tci/tcg-target.inc.c
++++ b/qemu/tcg/tci/tcg-target.inc.c
+@@ -548,6 +548,10 @@ static void tcg_out_movi(TCGContext *s, TCGType type,
+ 
+ static inline void tcg_out_call(TCGContext *s, tcg_insn_unit *arg)
+ {
++
++    extern void helper_wfi_aarch64();
++
++    printf("tcg_out_call: %p == %p\n", arg, helper_wfi_aarch64);
+     uint8_t *old_code_ptr = s->code_ptr;
+     tcg_out_op_t(s, INDEX_op_call);
+     tcg_out_ri(s, 1, (uintptr_t)arg);
+diff --git a/qemu/util/oslib-posix.c b/qemu/util/oslib-posix.c
+index 615e477e..847f09ed 100644
+--- a/qemu/util/oslib-posix.c
++++ b/qemu/util/oslib-posix.c
+@@ -29,7 +29,9 @@
+ #include <uc_priv.h>
+ #include "qemu/osdep.h"
+ 
+-#ifdef CONFIG_LINUX
++#define __wasm__
++
++#if defined(CONFIG_LINUX) && !defined(__wasm__)
+ #include <linux/mman.h>
+ #else  /* !CONFIG_LINUX */
+ #define MAP_SYNC              0x0
+@@ -179,6 +181,28 @@ static void *qemu_ram_mmap(struct uc_struct *uc,
+                     size_t align,
+                     bool shared)
+ {
++#ifdef __wasm__
++    size_t total = size + align - getpagesize();
++    void *ptr = mmap(0, total, PROT_READ | PROT_WRITE,
++                     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
++    size_t offset = QEMU_ALIGN_UP((uintptr_t)ptr, align) - (uintptr_t)ptr;
++
++    if (ptr == MAP_FAILED) {
++        return NULL;
++    }
++
++    ptr += offset;
++    total -= offset;
++
++    if (offset > 0) {
++        munmap(ptr - offset, offset);
++    }
++    if (total > size) {
++        munmap(ptr + size, total - size);
++    }
++
++    return ptr;
++#else
+     int flags;
+     int map_sync_flags = 0;
+     int guardfd;
+@@ -265,6 +289,7 @@ static void *qemu_ram_mmap(struct uc_struct *uc,
+     }
+ 
+     return ptr;
++#endif
+ }
+ 
+ static void qemu_ram_munmap(struct uc_struct *uc, void *ptr, size_t size)

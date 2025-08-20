@@ -74,6 +74,8 @@ static void tcg_target_qemu_prologue(TCGContext *s);
 static bool patch_reloc(tcg_insn_unit *code_ptr, int type,
                         intptr_t value, intptr_t addend);
 
+extern GHashTable *global_helper_table;
+
 /* The CIE and FDE header definitions will be common to all hosts.  */
 typedef struct {
     // uint32_t len __attribute__((aligned((sizeof(void *)))));
@@ -656,6 +658,7 @@ typedef struct TCGHelperInfo {
     const char *name;
     unsigned flags;
     unsigned sizemask;
+    unsigned n_args;
 } TCGHelperInfo;
 
 #include "exec/helper-proto.h"
@@ -766,6 +769,7 @@ void tcg_context_init(TCGContext *s)
     /* Use g_direct_hash/equal for direct pointer comparisons on func.  */
     helper_table = g_hash_table_new(NULL, NULL);
     s->helper_table = helper_table;
+    global_helper_table = helper_table;
 
     // Unicorn: Store our custom inline hooks infomation
     s->custom_helper_infos = g_hash_table_new_full(NULL, NULL, NULL, uc_free_inline_hook_info);
@@ -1456,6 +1460,10 @@ void tcg_gen_callN(TCGContext *tcg_ctx, void *func, TCGTemp *ret, int nargs, TCG
     TCGOp *op;
 
     info = g_hash_table_lookup(tcg_ctx->helper_table, (gpointer)func);
+    if (info == NULL) {
+        fprintf(stderr, "g_hash_table_lookup\n");
+        abort();
+    }
     flags = info->flags;
     sizemask = info->sizemask;
 

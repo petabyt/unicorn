@@ -5,6 +5,7 @@
 
 # Unset some variables known to interfere with behavior of common tools,
 # just as autoconf does.
+set -x
 CLICOLOR_FORCE= GREP_OPTIONS=
 unset CLICOLOR_FORCE GREP_OPTIONS
 
@@ -402,6 +403,8 @@ EOF
 
 if check_define __linux__ ; then
   targetos="Linux"
+elif check_define __wasm__ ; then
+  targetos='Linux'
 elif check_define _WIN32 ; then
   targetos='MINGW32'
 elif check_define __OpenBSD__ ; then

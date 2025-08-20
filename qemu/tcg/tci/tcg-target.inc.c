@@ -548,6 +548,9 @@ static void tcg_out_movi(TCGContext *s, TCGType type,
 
 static inline void tcg_out_call(TCGContext *s, tcg_insn_unit *arg)
 {
+
+    extern void helper_wfi_aarch64();
+
     uint8_t *old_code_ptr = s->code_ptr;
     tcg_out_op_t(s, INDEX_op_call);
     tcg_out_ri(s, 1, (uintptr_t)arg);
