@@ -310,7 +310,7 @@ static int ptr_cmp_tb_tc(const void *ptr, const struct tb_tc *s)
     return 0;
 }
 
-static gint tb_tc_cmp(gconstpointer ap, gconstpointer bp)
+static gint tb_tc_cmp(gconstpointer ap, gconstpointer bp, gpointer userdata)
 {
     const struct tb_tc *a = ap;
     const struct tb_tc *b = bp;
@@ -543,7 +543,7 @@ void tcg_region_init(TCGContext *tcg_ctx)
         (void)qemu_mprotect_none(end, page_size);
     }
 
-    tcg_ctx->tree = g_tree_new(tb_tc_cmp);
+    tcg_ctx->tree = g_tree_new((GCompareFunc)tb_tc_cmp); // wtf https://github.com/GNOME/glib/blob/08872dcd47a7e5b9d2a077ac1f3bce2550086055/glib/gtree.c#L139
     // Unicorn: Though this code is taken from CONFIG_USER_ONLY, it is crucial or
     //          tcg_ctx->region.current is 0 and we will miss a tb_flush when the
     //          buffer gets full.
@@ -690,6 +690,7 @@ void uc_add_inline_hook(uc_engine *uc, struct hook *hk, void** args, int args_le
     info->func = hk->callback;
     info->name = name;
     info->flags = 0; // From helper-head.h
+    info->n_args = 0;
 
     // Only UC_HOOK_BLOCK and UC_HOOK_CODE is generated into tcg code and can be inlined.
     switch (hk->type) {
@@ -698,6 +699,8 @@ void uc_add_inline_hook(uc_engine *uc, struct hook *hk, void** args, int args_le
         // (*uc_cb_hookcode_t)(uc_engine *uc, uint64_t address, uint32_t size, void *user_data);
         sizemask = dh_sizemask(void, 0) | dh_sizemask(ptr, 1) | dh_sizemask(i64, 2) | dh_sizemask(i32, 3) | dh_sizemask(ptr, 4);
         snprintf(name, 63, "hookcode_%d_%" PRIxPTR , hk->type, (uintptr_t)hk->callback);
+        info->n_args = 5; // 64 bit
+        info->flags |= 1; // void return
         break;
 
     default:

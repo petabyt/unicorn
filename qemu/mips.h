@@ -4,6 +4,8 @@
 #ifndef UNICORN_ARCH_POSTFIX
 #define UNICORN_ARCH_POSTFIX _mips
 #endif
+#define tci_tb_ptr tci_tb_ptr_mips
+#define tcg_qemu_tb_exec tcg_qemu_tb_exec_mips
 #define unicorn_fill_tlb unicorn_fill_tlb_mips
 #define reg_read reg_read_mips
 #define reg_write reg_write_mips

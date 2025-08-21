@@ -292,7 +292,6 @@ tci_read_ri(const tcg_target_ulong *regs, uint8_t **tb_ptr)
     tcg_target_ulong value;
     TCGReg r = **tb_ptr;
     *tb_ptr += 1;
-    printf("ptr %p\n", *tb_ptr);
     if (r == TCG_CONST) {
         value = tci_read_i(tb_ptr);
     } else {
@@ -475,7 +474,7 @@ static bool tci_compare64(uint64_t u0, uint64_t u1, TCGCond condition)
 # define qemu_st_beq(X)  stq_be_p(g2h(taddr), X)
 #endif
 
-GHashTable *global_helper_table = NULL;
+extern GHashTable *global_helper_table;
 typedef struct TCGHelperInfo {
     void *func;
     const char *name;
@@ -530,23 +529,34 @@ uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr)
         case INDEX_op_call:
             t0 = tci_read_ri(regs, &tb_ptr);
 
+#if 1
             info = g_hash_table_lookup(global_helper_table, (gpointer)t0);
             if (info == NULL) {
                 fprintf(stderr, "tci.c: g_hash_table_lookup\n");
                 abort();
             }
 
-            printf("n_args: %d\n", info->n_args);
+//            printf("n_args: %d\n", info->n_args);
+//            printf("name: %s\n", info->name);
+//            printf("flags: %d\n", info->flags);
+//            printf("sizemask: %d\n", info->sizemask);
 
             if (info->flags & 1) {
+                tmp64 = 0x0;
                 // return type void
-                switch (info->n_args) {
-                case 0: ((void (*)(void))t0)(); break;
-                case 1: ((void (*)(tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0)); break;
-                case 2: ((void (*)(tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1)); break;
-                case 3: ((void (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2)); break;
-                case 4: ((void (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3)); break;
-                default: abort();
+                if ((info->sizemask == 0x10 || info->sizemask == 276) && info->n_args == 5) {
+                    // Manual patches to try and match ABI
+                    ((void (*)(uintptr_t, uint64_t, size_t, uintptr_t))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3));
+                } else {
+                    switch (info->n_args) {
+                    case 0: ((void (*)(void))t0)(); break;
+                    case 1: ((void (*)(tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0)); break;
+                    case 2: ((void (*)(tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1)); break;
+                    case 3: ((void (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2)); break;
+                    case 4: ((void (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3)); break;
+                    case 5: ((void (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3), tci_read_reg(regs, TCG_REG_R4)); break;
+                    default: abort();
+                    }
                 }
             } else {
                 switch (info->n_args) {
@@ -555,10 +565,33 @@ uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr)
                 case 2: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1)); break;
                 case 3: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2)); break;
                 case 4: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3)); break;
+                case 5: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3), tci_read_reg(regs, TCG_REG_R4)); break;
                 default: abort();
                 }
             }
-
+#else
+#if TCG_TARGET_REG_BITS == 32
+            tmp64 = ((helper_function)t0)(tci_read_reg(regs, TCG_REG_R0),
+                                          tci_read_reg(regs, TCG_REG_R1),
+                                          tci_read_reg(regs, TCG_REG_R2),
+                                          tci_read_reg(regs, TCG_REG_R3),
+                                          tci_read_reg(regs, TCG_REG_R5),
+                                          tci_read_reg(regs, TCG_REG_R6),
+                                          tci_read_reg(regs, TCG_REG_R7),
+                                          tci_read_reg(regs, TCG_REG_R8),
+                                          tci_read_reg(regs, TCG_REG_R9),
+                                          tci_read_reg(regs, TCG_REG_R10),
+                                          tci_read_reg(regs, TCG_REG_R11),
+                                          tci_read_reg(regs, TCG_REG_R12));
+#else
+            tmp64 = ((helper_function)t0)(tci_read_reg(regs, TCG_REG_R0),
+                                          tci_read_reg(regs, TCG_REG_R1),
+                                          tci_read_reg(regs, TCG_REG_R2),
+                                          tci_read_reg(regs, TCG_REG_R3),
+                                          tci_read_reg(regs, TCG_REG_R5),
+                                          tci_read_reg(regs, TCG_REG_R6));
+#endif
+#endif
             
 #if TCG_TARGET_REG_BITS == 32
             tci_write_reg(regs, TCG_REG_R0, tmp64);

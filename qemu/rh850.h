@@ -4,6 +4,8 @@
 #ifndef UNICORN_ARCH_POSTFIX
 #define UNICORN_ARCH_POSTFIX _rh850
 #endif
+#define tci_tb_ptr tci_tb_ptr_rh850
+#define tcg_qemu_tb_exec tcg_qemu_tb_exec_rh850
 #define unicorn_fill_tlb unicorn_fill_tlb_rh850
 #define reg_read reg_read_rh850
 #define reg_write reg_write_rh850

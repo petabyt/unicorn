@@ -307,6 +307,19 @@ static void riscv_cpu_realize(struct uc_struct *uc, CPUState *dev)
     cpu_reset(cs);
 }
 
+#ifdef TARGET_RISCV32
+struct uc_struct *riscv32_cpu_get_uc(CPUArchState *env) {
+    CPURISCVState *env2 = (CPURISCVState *)env;
+    return env2->uc;
+}
+#endif
+#ifdef TARGET_RISCV64
+struct uc_struct *riscv64_cpu_get_uc(CPUArchState *env) {
+    CPURISCVState *env2 = (CPURISCVState *)env;
+    return env2->uc;
+}
+#endif
+
 static void riscv_cpu_init(struct uc_struct *uc, CPUState *obj)
 {
     RISCVCPU *cpu = RISCV_CPU(obj);

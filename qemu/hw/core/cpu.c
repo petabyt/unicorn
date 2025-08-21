@@ -23,6 +23,8 @@
 #include "hw/core/cpu.h"
 #include "sysemu/tcg.h"
 
+GHashTable *global_helper_table = NULL;
+
 bool cpu_paging_enabled(const CPUState *cpu)
 {
     CPUClass *cc = CPU_GET_CLASS(cpu);

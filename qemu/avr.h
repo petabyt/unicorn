@@ -4,6 +4,8 @@
 #ifndef UNICORN_ARCH_POSTFIX
 #define UNICORN_ARCH_POSTFIX _avr
 #endif
+#define tci_tb_ptr tci_tb_ptr_avr
+#define tcg_qemu_tb_exec tcg_qemu_tb_exec_avr
 #define unicorn_fill_tlb unicorn_fill_tlb_avr
 #define reg_read reg_read_avr
 #define reg_write reg_write_avr
