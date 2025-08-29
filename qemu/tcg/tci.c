@@ -474,14 +474,7 @@ static bool tci_compare64(uint64_t u0, uint64_t u1, TCGCond condition)
 # define qemu_st_beq(X)  stq_be_p(g2h(taddr), X)
 #endif
 
-extern GHashTable *global_helper_table;
-typedef struct TCGHelperInfo {
-    void *func;
-    const char *name;
-    unsigned flags;
-    unsigned sizemask;
-    unsigned n_args;
-} TCGHelperInfo;
+#include "ffi.inc.c"
 
 /* Interpret pseudo code in tb. */
 uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr)
@@ -523,52 +516,11 @@ uintptr_t tcg_qemu_tb_exec(CPUArchState *env, uint8_t *tb_ptr)
         /* Skip opcode and size entry. */
         tb_ptr += 2;
 
-        TCGHelperInfo *info;
-
         switch (opc) {
         case INDEX_op_call:
             t0 = tci_read_ri(regs, &tb_ptr);
-
 #if 1
-            info = g_hash_table_lookup(global_helper_table, (gpointer)t0);
-            if (info == NULL) {
-                fprintf(stderr, "tci.c: g_hash_table_lookup\n");
-                abort();
-            }
-
-//            printf("n_args: %d\n", info->n_args);
-//            printf("name: %s\n", info->name);
-//            printf("flags: %d\n", info->flags);
-//            printf("sizemask: %d\n", info->sizemask);
-
-            if (info->flags & 1) {
-                tmp64 = 0x0;
-                // return type void
-                if ((info->sizemask == 0x10 || info->sizemask == 276) && info->n_args == 5) {
-                    // Manual patches to try and match ABI
-                    ((void (*)(uintptr_t, uint64_t, size_t, uintptr_t))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3));
-                } else {
-                    switch (info->n_args) {
-                    case 0: ((void (*)(void))t0)(); break;
-                    case 1: ((void (*)(tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0)); break;
-                    case 2: ((void (*)(tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1)); break;
-                    case 3: ((void (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2)); break;
-                    case 4: ((void (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3)); break;
-                    case 5: ((void (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3), tci_read_reg(regs, TCG_REG_R4)); break;
-                    default: abort();
-                    }
-                }
-            } else {
-                switch (info->n_args) {
-                case 0: tmp64 = ((uint32_t (*)(void))t0)(); break;
-                case 1: tmp64 = ((uint32_t (*)(tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0)); break;
-                case 2: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1)); break;
-                case 3: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2)); break;
-                case 4: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3)); break;
-                case 5: tmp64 = ((uint32_t (*)(tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong, tcg_target_ulong))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3), tci_read_reg(regs, TCG_REG_R4)); break;
-                default: abort();
-                }
-            }
+            tmp64 = do_op_call(regs, t0);
 #else
 #if TCG_TARGET_REG_BITS == 32
             tmp64 = ((helper_function)t0)(tci_read_reg(regs, TCG_REG_R0),

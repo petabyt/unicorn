@@ -122,7 +122,7 @@
 #define dh_callflag_f64  0
 #define dh_callflag_ptr  0
 #define dh_callflag_cptr dh_callflag_ptr
-#define dh_callflag_void 1
+#define dh_callflag_void (1 << 15)
 #define dh_callflag_noreturn TCG_CALL_NO_RETURN
 #define dh_callflag(t) glue(dh_callflag_, dh_alias(t))
 
