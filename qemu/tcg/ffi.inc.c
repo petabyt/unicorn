@@ -30,7 +30,7 @@ static uint64_t do_op_call(tcg_target_ulong *regs, tcg_target_ulong t0) {
 	    abort();
 	}
 
-	// Manual ABI 
+	// Manual ABI interventions (wasm32 requires very specific conventions for uint64_t)
 #if TCG_TARGET_REG_BITS == 32
 	if (info->flags & dh_callflag_void && info->sizemask == 0x10 && info->n_args == 4) {
 	    ((void (*)(uint32_t, uint64_t, uint32_t, uint32_t))t0)(tci_read_reg(regs, TCG_REG_R0), tci_read_reg_ext(regs, TCG_REG_R1), tci_read_reg(regs, TCG_REG_R3), tci_read_reg(regs, TCG_REG_R4));

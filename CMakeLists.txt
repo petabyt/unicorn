@@ -564,6 +564,8 @@ set(UNICORN_ARCH_COMMON
 )
 
 if(UNICORN_INTERPRETER)
+    # TODO: Import libffi?
+    # ./configure CC=emcc CHOST=wasm32-unknown-linux --prefix=`pwd`/build --enable-static --disable-shared --disable-dependency-tracking --disable-builddir
     list(APPEND UNICORN_ARCH_COMMON qemu/tcg/tci.c)
 endif()
 
