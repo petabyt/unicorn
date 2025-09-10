@@ -2227,7 +2227,6 @@ store_helper(CPUArchState *env, target_ulong addr, uint64_t val,
 #ifdef TARGET_RISCV32
     struct uc_struct *riscv32_cpu_get_uc(CPUArchState *env);
     struct uc_struct *uc = riscv32_cpu_get_uc(env);
-    printf("riscv64 %p\n", uc);
 #else
     struct uc_struct *uc = env->uc;
 #endif
