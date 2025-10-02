@@ -32,6 +32,8 @@ static CPUState *do_raise_exception(CPUARMState *env, uint32_t excp,
 {
     CPUState *cs = env_cpu(env);
 
+    printf("Unicorn: Exception 0x%x\n", syndrome);
+
     if (target_el == 1 && (arm_hcr_el2_eff(env) & HCR_TGE)) {
         /*
          * Redirect NS EL1 exceptions to NS EL2. These are reported with
