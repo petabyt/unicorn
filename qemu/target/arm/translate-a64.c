@@ -441,6 +441,8 @@ void unallocated_encoding(DisasContext *s)
                        default_exception_el(s));
 }
 
+#define unallocated_encoding(xx) printf("unallocated_encoding line %d\n", __LINE__); unallocated_encoding_aarch64(xx)
+
 static void init_tmp_a64_array(DisasContext *s)
 {
 #ifdef CONFIG_DEBUG_TCG
@@ -4366,8 +4368,14 @@ static void disas_add_sub_imm(DisasContext *s, uint32_t insn)
     TCGv_i64 tcg_rd = setflags ? cpu_reg(s, rd) : cpu_reg_sp(s, rd);
     TCGv_i64 tcg_result;
 
-    if (shift) {
+    switch (shift) {
+    case 0x0:
+        break;
+    case 0x1:
         imm <<= 12;
+        break;
+    default:
+        printf("disas_add_sub_imm: %x\n", insn);
         unallocated_encoding(s);
         return;
     }
