@@ -10298,7 +10298,6 @@ static bool get_phys_addr_lpae(CPUARMState *env, target_ulong address,
      * remain non-secure. We implement this by just ORing in the NSTable/NS
      * bits at each step.
      */
-        printf("Scanning mmu at %lx\n", descaddr);
     tableattrs = regime_is_secure(env, mmu_idx) ? 0 : (1 << 4);
     for (;;) {
         uint64_t descriptor;
@@ -10318,8 +10317,8 @@ static bool get_phys_addr_lpae(CPUARMState *env, target_ulong address,
             goto do_fault;
         }
         descaddr = descriptor & descaddrmask;
+
         if ((descriptor & 2) && (level < 3)) {
-            printf("table entry: %lx\n", descaddr);
             /* Table entry. The top five bits are attributes which may
              * propagate down through lower levels of the table (and
              * which are all arranged so that 0 means "no effect", so
@@ -10330,7 +10329,6 @@ static bool get_phys_addr_lpae(CPUARMState *env, target_ulong address,
             indexmask = indexmask_grainsize;
             continue;
         }
-        printf("block entry output to: %lx\n", descriptor);
         /* Block entry at level 1 or 2, or page entry at level 3.
          * These are basically the same thing, although the number
          * of bits we pull in from the vaddr varies.
@@ -10384,8 +10382,7 @@ static bool get_phys_addr_lpae(CPUARMState *env, target_ulong address,
 
     fault_type = ARMFault_Permission;
     if (!(*prot & (1 << access_type))) {
-        printf("forgive permission fault @ %lx (%x, %x)\n", (uintptr_t)address, *prot, 1 << access_type);
-        //goto do_fault;
+        goto do_fault;
     }
 
     if (ns) {

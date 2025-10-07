@@ -1589,7 +1589,6 @@ load_helper(CPUArchState *env, target_ulong addr, TCGMemOpIdx oi,
         handled = false;
         // if there is already an unhandled eror, skip callbacks.
         if (uc->invalid_error == UC_ERR_OK) {
-            printf("Invalid error translating %lx\n", addr);
             if (code_read) {
                 // code fetching
                 error_code = UC_ERR_FETCH_UNMAPPED;
