@@ -4368,8 +4368,8 @@ static void disas_add_sub_imm(DisasContext *s, uint32_t insn)
 
     if (shift) {
         imm <<= 12;
-        unallocated_encoding(s);
-        return;
+//        unallocated_encoding(s);
+//        return;
     }
 
     tcg_result = tcg_temp_new_i64(tcg_ctx);
