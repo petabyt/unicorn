@@ -30,8 +30,6 @@ static uint64_t do_op_call(tcg_target_ulong *regs, tcg_target_ulong t0) {
 	    abort();
 	}
 
-	//debug_info(info);
-
 	// Manual ABI interventions (wasm32 requires very specific conventions for uint64_t)
 #if TCG_TARGET_REG_BITS == 32
 	if (info->flags & dh_callflag_void && info->sizemask == 0x10 && info->n_args == 4) {
@@ -41,10 +39,13 @@ static uint64_t do_op_call(tcg_target_ulong *regs, tcg_target_ulong t0) {
 	    return ((uint64_t (*)(uint64_t, uint64_t, uint64_t, uint32_t))t0)(tci_read_reg_ext(regs, TCG_REG_R0), tci_read_reg_ext(regs, TCG_REG_R2), tci_read_reg_ext(regs, TCG_REG_R4), tci_read_reg(regs, TCG_REG_R7));
 	} else if (info->sizemask == 4 && info->n_args == 3) {
 	    return ((uint32_t (*)(uint64_t, uint32_t, uint32_t))t0)(tci_read_reg_ext(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R2), tci_read_reg(regs, TCG_REG_R3));
+	} else if (info->sizemask == 0x15 && info->n_args == 2) {
+	    return ((uint64_t (*)(uint64_t, uint64_t))t0)(tci_read_reg_ext(regs, TCG_REG_R0), tci_read_reg(regs, TCG_REG_R2));
 	}
 
 	for (int i = 1; i < 15; i++) {
 	    if (info->sizemask & (1 << (i * 2))) {
+	        debug_info(info);
 	        printf("passed u32 to u64 func\n");
 	        abort();
 	    }
