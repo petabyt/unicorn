@@ -405,6 +405,8 @@ if check_define __linux__ ; then
   targetos="Linux"
 elif check_define __wasm__ ; then
   targetos='Linux'
+elif check_define __wasi__ ; then
+  targetos='Linux'
 elif check_define _WIN32 ; then
   targetos='MINGW32'
 elif check_define __OpenBSD__ ; then
@@ -503,6 +505,10 @@ elif check_define __AVR__ ; then
   cpu="avr"
 elif check_define __loongarch64 ; then
   cpu="loongarch64"
+elif check_define __wasi__ ; then
+  cpu="x32"
+elif check_define __wasm__ ; then
+  cpu="x32"
 else
   cpu=$(uname -m)
 fi
