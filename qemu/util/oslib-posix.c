@@ -183,25 +183,7 @@ static void *qemu_ram_mmap(struct uc_struct *uc,
 {
 #ifdef __wasm__
     size_t total = size + align - getpagesize();
-    void *ptr = mmap(0, total, PROT_READ | PROT_WRITE,
-                     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-    size_t offset = QEMU_ALIGN_UP((uintptr_t)ptr, align) - (uintptr_t)ptr;
-
-    if (ptr == MAP_FAILED) {
-        return NULL;
-    }
-
-    ptr += offset;
-    total -= offset;
-
-    if (offset > 0) {
-        munmap(ptr - offset, offset);
-    }
-    if (total > size) {
-        munmap(ptr + size, total - size);
-    }
-
-    return ptr;
+    return aligned_alloc(align, size);
 #else
     int flags;
     int map_sync_flags = 0;
@@ -303,7 +285,11 @@ static void qemu_ram_munmap(struct uc_struct *uc, void *ptr, size_t size)
 #else
         pagesize = uc->qemu_real_host_page_size;
 #endif
+#ifdef __wasm__
+        free(ptr);
+#else
         munmap(ptr, size + pagesize);
+#endif
     }
 }
 #endif
