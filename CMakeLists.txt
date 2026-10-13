@@ -519,7 +519,7 @@ else()
         -D_FILE_OFFSET_BITS=64
         -D_LARGEFILE_SOURCE
         -Wall -O2
-        -fPIC -fpic -fvisibility=hidden
+        -fPIC -fvisibility=hidden
     )
     if (ATOMIC_LINKAGE_FIX)
         add_compile_options(
