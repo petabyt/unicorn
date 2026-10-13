@@ -152,7 +152,12 @@ static void tcg_out_st(TCGContext *s, TCGType type, TCGReg arg, TCGReg arg1,
                        intptr_t arg2);
 static bool tcg_out_sti(TCGContext *s, TCGType type, TCGArg val,
                         TCGReg base, intptr_t ofs);
+#ifdef CONFIG_TCG_INTERPRETER
+static void tcg_out_call(TCGContext *s, tcg_insn_unit *target,
+                         uint32_t meta);
+#else
 static void tcg_out_call(TCGContext *s, tcg_insn_unit *target);
+#endif
 static int tcg_target_const_match(tcg_target_long val, TCGType type,
                                   const TCGArgConstraint *arg_ct);
 #ifdef TCG_TARGET_NEED_LDST_LABELS
@@ -3652,9 +3657,52 @@ static void tcg_reg_alloc_call(TCGContext *s, TCGOp *op)
     tcg_insn_unit *func_addr;
     int allocate_args;
     TCGRegSet allocated_regs;
+#ifdef CONFIG_TCG_INTERPRETER
+    uint32_t meta = 0;
+#endif
 
     func_addr = (tcg_insn_unit *)(intptr_t)op->args[nb_oargs + nb_iargs];
     flags = op->args[nb_oargs + nb_iargs + 1];
+
+#ifdef CONFIG_TCG_INTERPRETER
+    {
+        /*
+         * TCI: pack the helper signature into the TB stream so that the
+         * interpreter can issue an exactly-typed call (wasm32 traps on
+         * call_indirect type mismatch).  The lookup happens once per call
+         * site at translation time, never per TB execution.
+         * meta: bits 0-15 sizemask, 16-19 n_args, 20 void-return.
+         */
+        TCGHelperInfo *info =
+            g_hash_table_lookup(s->helper_table, (gpointer)func_addr);
+
+        if (info == NULL || info->n_args != (unsigned)nb_iargs
+            || info->sizemask > 0xFFFF) {
+            fprintf(stderr, "tcg_reg_alloc_call: bad helper %p\n",
+                    (void *)func_addr);
+            abort();
+        }
+#if TCG_TARGET_REG_BITS == 32
+        {
+            /* Each 64-bit argument occupies two iarg registers; the TCI
+               interpreter has no stack-spill path for helper arguments. */
+            unsigned words = 0, n;
+
+            for (n = 0; n < info->n_args; n++) {
+                words += (info->sizemask >> (n * 2 + 2)) & 1 ? 2 : 1;
+            }
+            if (words > ARRAY_SIZE(tcg_target_call_iarg_regs)) {
+                fprintf(stderr, "tcg_reg_alloc_call: helper %p spills\n",
+                        (void *)func_addr);
+                abort();
+            }
+        }
+#endif
+        meta = info->sizemask | (info->n_args << 16)
+            | ((!!(info->flags
+                   & (dh_callflag_void | TCG_CALL_NO_RETURN))) << 20);
+    }
+#endif
 
     nb_regs = ARRAY_SIZE(tcg_target_call_iarg_regs);
 #if TCG_TARGET_REG_BITS != 64
@@ -3754,7 +3802,11 @@ static void tcg_reg_alloc_call(TCGContext *s, TCGOp *op)
         save_globals(s, allocated_regs);
     }
 
+#ifdef CONFIG_TCG_INTERPRETER
+    tcg_out_call(s, func_addr, meta);
+#else
     tcg_out_call(s, func_addr);
+#endif
 
     /* assign output registers and emit moves if needed */
     for(i = 0; i < nb_oargs; i++) {

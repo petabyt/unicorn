@@ -546,14 +546,15 @@ static void tcg_out_movi(TCGContext *s, TCGType type,
     old_code_ptr[1] = s->code_ptr - old_code_ptr;
 }
 
-static inline void tcg_out_call(TCGContext *s, tcg_insn_unit *arg)
+/* Emit a typed helper call: [opc][size][ri(func)][meta].
+   meta (see tcg.c tcg_reg_alloc_call): sizemask | n_args<<16 | void<<20. */
+static inline void tcg_out_call(TCGContext *s, tcg_insn_unit *arg,
+                                uint32_t meta)
 {
-
-    extern void helper_wfi_aarch64();
-
     uint8_t *old_code_ptr = s->code_ptr;
     tcg_out_op_t(s, INDEX_op_call);
     tcg_out_ri(s, 1, (uintptr_t)arg);
+    tcg_out32(s, meta);
     old_code_ptr[1] = s->code_ptr - old_code_ptr;
 }
 
