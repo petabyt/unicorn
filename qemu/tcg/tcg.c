@@ -3675,29 +3675,40 @@ static void tcg_reg_alloc_call(TCGContext *s, TCGOp *op)
          */
         TCGHelperInfo *info =
             g_hash_table_lookup(s->helper_table, (gpointer)func_addr);
+        unsigned words = 0, n;
 
-        if (info == NULL || info->n_args != (unsigned)nb_iargs
-            || info->sizemask > 0xFFFF) {
+        if (info == NULL || info->sizemask > 0xFFFF) {
             fprintf(stderr, "tcg_reg_alloc_call: bad helper %p\n",
                     (void *)func_addr);
             abort();
         }
+        /*
+         * tcg_gen_callN records one op-arg per argument on 64-bit hosts,
+         * but splits each 64-bit argument into two 32-bit op-args on
+         * 32-bit hosts (TCGOP_CALLI counts words, not logical args), so
+         * compare against the word count.  The sizemask walk mirrors the
+         * split in tcg_gen_callN exactly; the TCI interpreter has no
+         * stack-spill path for helper arguments.
+         */
+        for (n = 0; n < info->n_args; n++) {
 #if TCG_TARGET_REG_BITS == 32
-        {
-            /* Each 64-bit argument occupies two iarg registers; the TCI
-               interpreter has no stack-spill path for helper arguments. */
-            unsigned words = 0, n;
-
-            for (n = 0; n < info->n_args; n++) {
-                words += (info->sizemask >> (n * 2 + 2)) & 1 ? 2 : 1;
-            }
-            if (words > ARRAY_SIZE(tcg_target_call_iarg_regs)) {
-                fprintf(stderr, "tcg_reg_alloc_call: helper %p spills\n",
-                        (void *)func_addr);
-                abort();
-            }
-        }
+            words += (info->sizemask >> (n * 2 + 2)) & 1 ? 2 : 1;
+#else
+            words += 1;
 #endif
+        }
+        if (words != (unsigned)nb_iargs) {
+            fprintf(stderr,
+                    "tcg_reg_alloc_call: bad helper %p: "
+                    "n_args=%u words=%u nb_iargs=%d\n",
+                    (void *)func_addr, info->n_args, words, nb_iargs);
+            abort();
+        }
+        if (words > ARRAY_SIZE(tcg_target_call_iarg_regs)) {
+            fprintf(stderr, "tcg_reg_alloc_call: helper %p spills\n",
+                    (void *)func_addr);
+            abort();
+        }
         meta = info->sizemask | (info->n_args << 16)
             | ((!!(info->flags
                    & (dh_callflag_void | TCG_CALL_NO_RETURN))) << 20);
